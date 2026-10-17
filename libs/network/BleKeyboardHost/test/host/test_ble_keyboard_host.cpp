@@ -629,6 +629,15 @@ void testRemoteButtonProfiles() {
 }
 
 int main() {
+  fakeble::resetWorld();
+  fakeble::failNextTaskCreate();
+  CHECK(!host().begin());
+  CHECK(!host().isRunning());
+  CHECK(!fakeble::clientExists());
+  CHECK(host().end());
+  CHECK(host().begin());
+  CHECK(host().isRunning());
+  CHECK(host().end());
   testRemoteButtonProfiles();
   testKeyboardPressIsOneKeyEvent();
   testEndDuringPairingDoesNotDeleteTaskInsideNimble(fakeble::Stage::Security);

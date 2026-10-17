@@ -44,6 +44,7 @@ struct Task {
 };
 
 Task* g_task = nullptr;
+bool failNextTask = false;
 thread_local Task* t_task = nullptr;
 bool g_deletedWhileHeld = false;
 
@@ -105,6 +106,10 @@ void portEnterCritical(portMUX_TYPE*) { criticalMutex().lock(); }
 void portExitCritical(portMUX_TYPE*) { criticalMutex().unlock(); }
 
 BaseType_t xTaskCreate(void (*fn)(void*), const char*, uint32_t, void* arg, UBaseType_t, TaskHandle_t* outHandle) {
+  if (failNextTask) {
+    failNextTask = false;
+    return 0;
+  }
   Task* task = new Task();
   g_task = task;
   task->thread = std::thread([task, fn, arg] {
@@ -514,3 +519,7 @@ size_t Preferences::putBytes(const char* key, const void* buf, size_t len) {
   state().nvs[ns_ + "/" + key].assign(bytes, bytes + len);
   return len;
 }
+
+namespace fakeble {
+void failNextTaskCreate() { failNextTask = true; }
+}  // namespace fakeble

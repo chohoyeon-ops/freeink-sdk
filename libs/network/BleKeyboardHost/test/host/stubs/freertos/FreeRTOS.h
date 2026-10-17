@@ -23,3 +23,7 @@ void portEnterCritical(portMUX_TYPE* mux);
 void portExitCritical(portMUX_TYPE* mux);
 #define portENTER_CRITICAL(mux) portEnterCritical(mux)
 #define portEXIT_CRITICAL(mux) portExitCritical(mux)
+
+#ifndef pdPASS
+#define pdPASS pdTRUE
+#endif

@@ -73,3 +73,7 @@ unsigned long clockMs();
 void advanceMillis(uint32_t ms);
 
 }  // namespace fakeble
+
+namespace fakeble {
+void failNextTaskCreate();
+}

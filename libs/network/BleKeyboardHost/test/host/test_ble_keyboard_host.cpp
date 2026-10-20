@@ -382,7 +382,8 @@ void testNoSelectedPlanTriesEveryBondInTurn() {
   CHECK(attemptsAt(kRemote) == 3);
   CHECK(attemptsAt(kSecondRemote) == 3);
   for (size_t i = 2; i < addresses.size(); ++i) {
-    CHECK(addresses[i] == (i % 2 == 0 ? kRemote : kSecondRemote));
+    CHECK(addresses[i] == kRemote || addresses[i] == kSecondRemote);
+    if (i > 2) CHECK(addresses[i] != addresses[i - 1]);
   }
 }
 

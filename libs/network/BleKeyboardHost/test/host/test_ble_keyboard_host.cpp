@@ -371,6 +371,21 @@ void testSelectedPeerIsTheOnlyOneRetriedSixTimes() {
   CHECK(attemptsAt(kRemote) == 0);  // no fallback to the other bond
 }
 
+void testNoSelectedPlanTriesEveryBondInTurn() {
+  bondTwoRemotesThenSwitchThemOff();
+  for (int i = 0; i < 6; ++i) {
+    fakeble::advanceMillis(4001);
+    pollOnce();
+  }
+  const auto addresses = fakeble::connectAddresses();
+  CHECK(addresses.size() == 8);
+  CHECK(attemptsAt(kRemote) == 3);
+  CHECK(attemptsAt(kSecondRemote) == 3);
+  for (size_t i = 2; i < addresses.size(); ++i) {
+    CHECK(addresses[i] == (i % 2 == 0 ? kRemote : kSecondRemote));
+  }
+}
+
 void testSelectedPlanStartsNothingAfterItsWindow() {
   bondTwoRemotesThenSwitchThemOff();
   CHECK(host().armSelectedPeerReconnect(kSecondRemote));
@@ -720,6 +735,7 @@ int main() {
   testEndLeavesAStuckTaskAloneAndFinishesLater();
   testEndWaitsForTheClientToFinishDisconnecting();
   testSelectedPeerIsTheOnlyOneRetriedSixTimes();
+  testNoSelectedPlanTriesEveryBondInTurn();
   testSelectedPlanStartsNothingAfterItsWindow();
   testArmIsRefusedWhenItCannotApply();
   testConnectAndDisconnectCancelThePlan();

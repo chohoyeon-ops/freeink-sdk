@@ -533,7 +533,14 @@ bool BleKeyboardHost::begin(const char* hostName) {
   g_client->setConnectionParams(/*minInterval=*/12, /*maxInterval=*/24, /*latency=*/0, /*timeout=*/800);
   g_client->setClientCallbacks(&g_clientCb, false);
 
-  xTaskCreate(connTaskFn, "ble-conn", 4096, nullptr, 3, &g_connTask);
+  if (xTaskCreate(connTaskFn, "ble-conn", 4096, nullptr, 3, &g_connTask) != pdPASS) {
+    g_connTask = nullptr;
+    NimBLEDevice::deleteClient(g_client);
+    g_client = nullptr;
+    NimBLEDevice::deinit(true);
+    onConnectFailed("No memory for BLE connection task");
+    return false;
+  }
   begun_ = true;
 #if FREEINK_BLE_HID_SCAN_DEBUG
   Serial.println("[BleHid] begin: ok");

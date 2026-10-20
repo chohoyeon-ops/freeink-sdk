@@ -64,6 +64,14 @@ bool waitUntilHeld(Stage stage, uint32_t timeoutMs = 1000);
 // inside a NimBLE wait.
 bool taskDeletedWhileHeld();
 
+// One-shot allocation failures and lifecycle observations for begin() recovery.
+void failNextTaskCreate();
+void failNextClientCreate();
+bool taskExists();
+size_t taskCreateCalls();
+size_t taskDeleteCalls();
+std::vector<std::string> lifecycleCalls();
+
 size_t connectCalls();
 // Addresses the host asked NimBLE to connect to, in order.
 std::vector<std::string> connectAddresses();

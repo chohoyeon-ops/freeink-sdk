@@ -46,6 +46,9 @@ struct Task {
 Task* g_task = nullptr;
 thread_local Task* t_task = nullptr;
 bool g_deletedWhileHeld = false;
+bool g_failNextTaskCreate = false;
+size_t g_taskCreateCalls = 0;
+size_t g_taskDeleteCalls = 0;
 
 struct Gate {
   std::mutex m;
@@ -105,6 +108,11 @@ void portEnterCritical(portMUX_TYPE*) { criticalMutex().lock(); }
 void portExitCritical(portMUX_TYPE*) { criticalMutex().unlock(); }
 
 BaseType_t xTaskCreate(void (*fn)(void*), const char*, uint32_t, void* arg, UBaseType_t, TaskHandle_t* outHandle) {
+  ++g_taskCreateCalls;
+  if (g_failNextTaskCreate) {
+    g_failNextTaskCreate = false;
+    return pdFALSE;
+  }
   Task* task = new Task();
   g_task = task;
   task->thread = std::thread([task, fn, arg] {
@@ -121,6 +129,7 @@ BaseType_t xTaskCreate(void (*fn)(void*), const char*, uint32_t, void* arg, UBas
 void vTaskDelete(TaskHandle_t handle) {
   Task* task = static_cast<Task*>(handle);
   if (task == nullptr) return;
+  ++g_taskDeleteCalls;
   bool held = false;
   {
     std::lock_guard<std::mutex> guard(gate().m);
@@ -175,6 +184,8 @@ namespace fakeble {
 
 struct FakeState {
   bool initialized = false;
+  bool failNextClientCreate = false;
+  std::vector<std::string> lifecycleCalls;
   int lastError = 0;
   size_t connectCalls = 0;
   std::vector<std::string> connectAddresses;
@@ -257,6 +268,8 @@ struct FakeState {
     owned.clear();
     chars.clear();
     initialized = false;
+    failNextClientCreate = false;
+    lifecycleCalls.clear();
     lastError = 0;
     connectCalls = 0;
     connectAddresses.clear();
@@ -286,11 +299,21 @@ void resetWorld() {
     gate().stubborn = false;
   }
   g_deletedWhileHeld = false;
+  g_failNextTaskCreate = false;
+  g_taskCreateCalls = 0;
+  g_taskDeleteCalls = 0;
   state().reset();
   g_clockMs = 1000;
 }
 
 bool beginHost() { return host().begin("FreeInk"); }
+
+void failNextTaskCreate() { g_failNextTaskCreate = true; }
+void failNextClientCreate() { state().failNextClientCreate = true; }
+bool taskExists() { return g_task != nullptr; }
+size_t taskCreateCalls() { return g_taskCreateCalls; }
+size_t taskDeleteCalls() { return g_taskDeleteCalls; }
+std::vector<std::string> lifecycleCalls() { return state().lifecycleCalls; }
 
 bool connectTo(const char* addr, uint32_t timeoutMs) {
   if (!host().connect(addr)) return false;
@@ -454,10 +477,12 @@ bool NimBLEScan::stop() {
 void NimBLEScan::clearResults() { retained_.clear(); }
 
 bool NimBLEDevice::init(const std::string&) {
+  state().lifecycleCalls.push_back("init");
   state().initialized = true;
   return true;
 }
 bool NimBLEDevice::deinit(bool) {
+  state().lifecycleCalls.push_back("deinit");
   state().initialized = false;
   return true;
 }
@@ -473,11 +498,17 @@ bool NimBLEDevice::injectPassKey(const NimBLEConnInfo&, uint32_t) { return true;
 bool NimBLEDevice::injectConfirmPasskey(const NimBLEConnInfo&, bool) { return true; }
 NimBLEScan* NimBLEDevice::getScan() { return &state().scan; }
 NimBLEClient* NimBLEDevice::createClient() {
+  state().lifecycleCalls.push_back("createClient");
+  if (state().failNextClientCreate) {
+    state().failNextClientCreate = false;
+    return nullptr;
+  }
   if (state().client == nullptr) state().client = new NimBLEClient();
   return state().client;
 }
 bool NimBLEDevice::deleteClient(NimBLEClient* client) {
   if (client == nullptr || client != state().client) return false;
+  state().lifecycleCalls.push_back("deleteClient");
   delete client;
   state().client = nullptr;
   return true;

@@ -12,6 +12,7 @@ typedef int BaseType_t;
 typedef unsigned int UBaseType_t;
 
 #define pdTRUE 1
+#define pdPASS pdTRUE
 #define pdFALSE 0
 #define portMAX_DELAY 0xFFFFFFFFu
 #define pdMS_TO_TICKS(ms) (ms)

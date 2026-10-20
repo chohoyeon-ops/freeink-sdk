@@ -632,7 +632,80 @@ void testRemoteButtonProfiles() {
   }
 }
 
+void testTaskCreateFailureUnwindsAndRetries() {
+  fakeble::resetWorld();
+  fakeble::failNextTaskCreate();
+  CHECK(!fakeble::beginHost());
+  CHECK(!host().isRunning());
+  CHECK(!host().isConnected());
+  CHECK(!host().isConnecting());
+  CHECK(!host().isStopping());
+  CHECK(!fakeble::taskExists());
+  CHECK(!fakeble::clientExists());
+  CHECK(!NimBLEDevice::isInitialized());
+  CHECK(fakeble::taskCreateCalls() == 1);
+  CHECK(fakeble::taskDeleteCalls() == 0);
+  CHECK(fakeble::lifecycleCalls() ==
+        std::vector<std::string>({"init", "createClient", "deleteClient", "deinit"}));
+  char failure[64] = {};
+  CHECK(host().takeConnectFailure(failure, sizeof failure));
+  CHECK(std::strcmp(failure, "No memory for BLE connection task") == 0);
+  CHECK(!host().takeConnectFailure(failure, sizeof failure));
+  CHECK(host().end());
+  CHECK(host().end());
+  CHECK(fakeble::lifecycleCalls().size() == 4);
+  CHECK(fakeble::beginHost());
+  CHECK(host().isRunning());
+  CHECK(fakeble::taskExists());
+  CHECK(fakeble::clientExists());
+  CHECK(fakeble::beginHost());
+  CHECK(fakeble::taskCreateCalls() == 2);
+  CHECK(host().end());
+  CHECK(host().end());
+  CHECK(fakeble::taskDeleteCalls() == 1);
+  CHECK(!fakeble::taskExists());
+  CHECK(!fakeble::clientExists());
+  CHECK(!NimBLEDevice::isInitialized());
+}
+
+void testClientCreateFailureUnwindsAndRetries() {
+  fakeble::resetWorld();
+  fakeble::failNextClientCreate();
+  CHECK(!fakeble::beginHost());
+  CHECK(!host().isRunning());
+  CHECK(!fakeble::clientExists());
+  CHECK(!fakeble::taskExists());
+  CHECK(!NimBLEDevice::isInitialized());
+  CHECK(fakeble::taskCreateCalls() == 0);
+  CHECK(fakeble::lifecycleCalls() == std::vector<std::string>({"init", "createClient", "deinit"}));
+  CHECK(host().end());
+  CHECK(fakeble::beginHost());
+  CHECK(host().end());
+}
+
+void testRepeatedTaskCreateFailuresDoNotAccumulateResources() {
+  fakeble::resetWorld();
+  for (int i = 0; i < 8; ++i) {
+    fakeble::failNextTaskCreate();
+    CHECK(!fakeble::beginHost());
+    CHECK(!host().isRunning());
+    CHECK(!fakeble::clientExists());
+    CHECK(!fakeble::taskExists());
+    CHECK(!NimBLEDevice::isInitialized());
+    CHECK(host().end());
+    CHECK(fakeble::beginHost());
+    CHECK(fakeble::beginHost());
+    CHECK(host().end());
+    CHECK(host().end());
+  }
+  CHECK(fakeble::taskCreateCalls() == 16);
+  CHECK(fakeble::taskDeleteCalls() == 8);
+}
+
 int main() {
+  testTaskCreateFailureUnwindsAndRetries();
+  testClientCreateFailureUnwindsAndRetries();
+  testRepeatedTaskCreateFailuresDoNotAccumulateResources();
   testRemoteButtonProfiles();
   testKeyboardPressIsOneKeyEvent();
   testEndDuringPairingDoesNotDeleteTaskInsideNimble(fakeble::Stage::Security);

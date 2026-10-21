@@ -29,6 +29,9 @@ struct FetchOptions {
   // already content-encrypted, this skips a second TLS session and its record
   // buffer on low-heap boards; only the URL token loses transport security.
   bool redirectToHttp = false;
+  // Verified callers require TLS on the initial URL, every redirect and retry.
+  // Kept opt-in so existing HTTP/self-hosted callers retain their policy.
+  bool requireHttps = false;
 };
 
 struct FetchSink {
@@ -110,6 +113,13 @@ inline FetchResult fetchResumable(const std::string& startUrl, const FetchOption
   int redirects = 0;
   int stalled = 0;
   for (int attempt = 0; attempt < kMaxAttempts && stalled < kMaxStalled; ++attempt) {
+    if (options.requireHttps) {
+      const std::string origin = fetchOrigin(url);
+      if (origin.rfind("https://", 0) != 0 || options.redirectToHttp) {
+        result.status = -1;
+        return result;
+      }
+    }
     SecureHttpClient http;
     if (!http.begin(url)) {
       result.status = -1;

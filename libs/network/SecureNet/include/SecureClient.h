@@ -36,6 +36,8 @@ class SecureClient : public Client {
   using AbortCallback = std::function<bool()>;
 
   // Certificate / verification configuration (applied before connect()).
+  // setCACert re-enables peer chain and hostname verification. Missing/invalid
+  // anchors or unavailable certificate support fail closed; no insecure retry.
   void setCACert(const char* rootCA);
   void setInsecure();  // skip peer verification (testing only)
 
